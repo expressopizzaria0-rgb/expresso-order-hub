@@ -31,7 +31,7 @@ export default function OnlineOrders() {
 
   if (isLoading) return <Loader2 className="animate-spin h-6 w-6 text-primary" />;
 
-  const setStatus = async (id: string, status: string) => {
+  const setStatus = async (id: string, status: any) => {
     await supabase.from("orders").update({ status }).eq("id", id);
     qc.invalidateQueries({ queryKey: ["online-orders"] });
   };
