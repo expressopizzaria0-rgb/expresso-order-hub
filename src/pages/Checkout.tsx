@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import PublicHeader from "@/components/PublicHeader";
@@ -11,13 +11,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card } from "@/components/ui/card";
 import { brl, phoneDigits } from "@/lib/format";
-import { Plus, Minus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Minus, Trash2, Loader2, UserCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+const CUSTOMER_KEY = "expresso_customer_v1";
+
+type SavedCustomer = {
+  name: string;
+  phone: string;
+  address: string;
+  neighborhood: string;
+  type: "delivery" | "retirada";
+  payment: "dinheiro" | "pix" | "cartao";
+};
+
+function loadCustomer(): SavedCustomer | null {
+  try {
+    const raw = localStorage.getItem(CUSTOMER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCustomer(data: SavedCustomer) {
+  localStorage.setItem(CUSTOMER_KEY, JSON.stringify(data));
+}
+
 const checkoutSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome").max(100),
-  phone: z.string().trim().min(10, "Telefone inválido").max(20),
+  phone: z.string().trim().min(10, "Telefone invalido").max(20),
   type: z.enum(["delivery", "retirada"]),
   payment: z.enum(["dinheiro", "pix", "cartao"]),
   address: z.string().max(200).optional(),
@@ -31,15 +55,26 @@ export default function Checkout() {
   const { data: settings } = useSettings();
   const nav = useNavigate();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [type, setType] = useState<"delivery" | "retirada">("delivery");
-  const [payment, setPayment] = useState<"dinheiro" | "pix" | "cartao">("pix");
-  const [address, setAddress] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
+  const saved = loadCustomer();
+
+  const [name, setName] = useState(saved?.name ?? "");
+  const [phone, setPhone] = useState(saved?.phone ?? "");
+  const [type, setType] = useState<"delivery" | "retirada">(saved?.type ?? "delivery");
+  const [payment, setPayment] = useState<"dinheiro" | "pix" | "cartao">(saved?.payment ?? "pix");
+  const [address, setAddress] = useState(saved?.address ?? "");
+  const [neighborhood, setNeighborhood] = useState(saved?.neighborhood ?? "");
   const [changeFor, setChangeFor] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [hasSaved, setHasSaved] = useState(!!saved);
+
+  const clearSaved = () => {
+    localStorage.removeItem(CUSTOMER_KEY);
+    setName(""); setPhone(""); setAddress(""); setNeighborhood("");
+    setType("delivery"); setPayment("pix");
+    setHasSaved(false);
+    toast.success("Dados apagados");
+  };
 
   const deliveryFee = type === "delivery" ? Number(settings?.delivery_fee ?? 0) : 0;
   const cardFeePct = Number(settings?.card_fee_percent ?? 0);
@@ -51,7 +86,7 @@ export default function Checkout() {
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     if (items.length === 0) { toast.error("Carrinho vazio"); return; }
     if (type === "delivery" && (!address.trim() || !neighborhood.trim())) {
-      toast.error("Informe endereço e bairro para delivery"); return;
+      toast.error("Informe endereco e bairro para delivery"); return;
     }
     setSubmitting(true);
     try {
@@ -90,13 +125,16 @@ export default function Checkout() {
       })));
       if (ierr) throw ierr;
 
-      // Build WhatsApp message
+      // Salva dados do cliente para proximos pedidos
+      saveCustomer({ name: name.trim(), phone: phone.trim(), address: address.trim(), neighborhood: neighborhood.trim(), type, payment });
+
+      // Monta mensagem WhatsApp
       const lines: string[] = [];
       lines.push(`*Novo Pedido — Expresso Pizza e Esfirra*`);
       lines.push(`*Cliente:* ${name}`);
       lines.push(`*Telefone:* ${phone}`);
       lines.push(`*Tipo:* ${type === "delivery" ? "Delivery" : "Retirada"}`);
-      if (type === "delivery") lines.push(`*Endereço:* ${address}, ${neighborhood}`);
+      if (type === "delivery") lines.push(`*Endereco:* ${address}, ${neighborhood}`);
       lines.push("");
       lines.push("*Itens:*");
       items.forEach((i) => {
@@ -108,10 +146,10 @@ export default function Checkout() {
       lines.push("");
       lines.push(`Subtotal: ${brl(subtotal)}`);
       if (deliveryFee) lines.push(`Taxa de entrega: ${brl(deliveryFee)}`);
-      if (cardFee) lines.push(`Taxa de cartão: ${brl(cardFee)}`);
+      if (cardFee) lines.push(`Taxa de cartao: ${brl(cardFee)}`);
       lines.push(`*Total: ${brl(total)}*`);
       lines.push("");
-      lines.push(`*Pagamento:* ${payment === "dinheiro" ? "Dinheiro" : payment === "pix" ? "Pix" : "Cartão"}`);
+      lines.push(`*Pagamento:* ${payment === "dinheiro" ? "Dinheiro" : payment === "pix" ? "Pix" : "Cartao"}`);
       if (payment === "dinheiro" && changeFor) lines.push(`Troco para: ${brl(Number(changeFor.replace(",", ".")) || 0)}`);
       if (notes) lines.push(`*Obs:* ${notes}`);
 
@@ -137,11 +175,12 @@ export default function Checkout() {
 
         {items.length === 0 ? (
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground">Seu carrinho está vazio.</p>
-            <Button className="mt-4" onClick={() => nav("/")}>Ver cardápio</Button>
+            <p className="text-muted-foreground">Seu carrinho esta vazio.</p>
+            <Button className="mt-4" onClick={() => nav("/")}>Ver cardapio</Button>
           </Card>
         ) : (
           <>
+            {/* Itens do carrinho */}
             <Card className="p-4 space-y-3">
               {items.map((i) => (
                 <div key={i.id} className="flex items-center justify-between gap-2 border-b last:border-0 pb-3 last:pb-0">
@@ -161,7 +200,22 @@ export default function Checkout() {
               ))}
             </Card>
 
+            {/* Dados do cliente */}
             <Card className="p-4 space-y-4">
+
+              {/* Banner: dados salvos */}
+              {hasSaved && (
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm text-emerald-700 font-medium">
+                    <UserCheck className="h-4 w-4" />
+                    Seus dados foram preenchidos automaticamente
+                  </span>
+                  <button onClick={clearSaved} className="text-emerald-600 hover:text-emerald-800">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="n">Nome *</Label>
@@ -187,15 +241,21 @@ export default function Checkout() {
 
               {type === "delivery" && (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2"><Label>Endereço *</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} maxLength={200} placeholder="Rua, número, complemento" /></div>
-                  <div className="sm:col-span-2"><Label>Bairro *</Label><Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} maxLength={100} /></div>
+                  <div className="sm:col-span-2">
+                    <Label>Endereco *</Label>
+                    <Input value={address} onChange={(e) => setAddress(e.target.value)} maxLength={200} placeholder="Rua, numero, complemento" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Bairro *</Label>
+                    <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} maxLength={100} />
+                  </div>
                 </div>
               )}
 
               <div>
                 <Label className="mb-2 block">Forma de pagamento</Label>
                 <RadioGroup value={payment} onValueChange={(v: any) => setPayment(v)} className="grid grid-cols-3 gap-2">
-                  {[["pix", "Pix"], ["dinheiro", "Dinheiro"], ["cartao", "Cartão"]].map(([v, l]) => (
+                  {[["pix", "Pix"], ["dinheiro", "Dinheiro"], ["cartao", "Cartao"]].map(([v, l]) => (
                     <Label key={v} className={`border rounded-md p-3 cursor-pointer flex items-center gap-2 justify-center ${payment === v ? "border-primary bg-primary/5" : ""}`}>
                       <RadioGroupItem value={v} /> {l}
                     </Label>
@@ -204,20 +264,26 @@ export default function Checkout() {
               </div>
 
               {payment === "dinheiro" && (
-                <div><Label>Troco para</Label><Input value={changeFor} onChange={(e) => setChangeFor(e.target.value)} placeholder="Ex: 100" /></div>
+                <div>
+                  <Label>Troco para</Label>
+                  <Input value={changeFor} onChange={(e) => setChangeFor(e.target.value)} placeholder="Ex: 100" />
+                </div>
               )}
 
               <div>
-                <Label>Observação</Label>
+                <Label>Observacao geral</Label>
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} rows={2} />
               </div>
             </Card>
 
+            {/* Totais */}
             <Card className="p-4 space-y-1.5">
               <div className="flex justify-between"><span>Subtotal</span><span>{brl(subtotal)}</span></div>
               {deliveryFee > 0 && <div className="flex justify-between"><span>Taxa de entrega</span><span>{brl(deliveryFee)}</span></div>}
-              {cardFee > 0 && <div className="flex justify-between"><span>Taxa de cartão ({cardFeePct}%)</span><span>{brl(cardFee)}</span></div>}
-              <div className="flex justify-between text-xl font-bold pt-2 border-t"><span>Total</span><span className="text-primary">{brl(total)}</span></div>
+              {cardFee > 0 && <div className="flex justify-between"><span>Taxa de cartao ({cardFeePct}%)</span><span>{brl(cardFee)}</span></div>}
+              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                <span>Total</span><span className="text-primary">{brl(total)}</span>
+              </div>
             </Card>
 
             <Button size="lg" className="w-full text-lg" onClick={submit} disabled={submitting}>
