@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -55,61 +55,92 @@ export default function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md w-full flex flex-col p-0 gap-0 max-h-[92vh]">
+
+        {/* Cabecalho fixo */}
+        <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="pizza-title text-2xl text-primary">{product.name}</DialogTitle>
-          {product.description && <p className="text-sm text-muted-foreground">{product.description}</p>}
+          {product.description && (
+            <p className="text-sm text-muted-foreground">{product.description}</p>
+          )}
         </DialogHeader>
 
-        {product.has_sizes && (
-          <div>
-            <Label className="mb-2 block">Tamanho</Label>
-            <RadioGroup value={size} onValueChange={setSize} className="grid grid-cols-2 gap-2">
-              {sizes.map((s) => (
-                <Label key={s.id} htmlFor={s.id} className={`flex items-center justify-between border rounded-md p-3 cursor-pointer ${size === s.size ? "border-primary bg-primary/5" : ""}`}>
-                  <span className="flex items-center gap-2"><RadioGroupItem value={s.size} id={s.id} /><span className="font-semibold">{s.size}</span></span>
-                  <span className="font-bold text-primary">{brl(Number(s.price))}</span>
-                </Label>
-              ))}
-            </RadioGroup>
-          </div>
-        )}
+        {/* Miolo com rolagem */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {product.has_sizes && (
+            <div>
+              <Label className="mb-2 block font-semibold">Tamanho</Label>
+              <RadioGroup value={size} onValueChange={setSize} className="grid grid-cols-2 gap-2">
+                {sizes.map((s) => (
+                  <Label key={s.id} htmlFor={s.id}
+                    className={`flex items-center justify-between border rounded-md p-3 cursor-pointer ${
+                      size === s.size ? "border-primary bg-primary/5" : ""
+                    }`}>
+                    <span className="flex items-center gap-2">
+                      <RadioGroupItem value={s.size} id={s.id} />
+                      <span className="font-semibold">{s.size}</span>
+                    </span>
+                    <span className="font-bold text-primary">{brl(Number(s.price))}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
 
-        {showAddons && (
-          <div>
-            <Label className="mb-2 block">Borda recheada (opcional)</Label>
-            <RadioGroup value={addonId} onValueChange={setAddonId} className="space-y-1.5">
-              <Label className={`flex items-center justify-between border rounded-md p-2.5 cursor-pointer ${addonId === "none" ? "border-primary bg-primary/5" : ""}`}>
-                <span className="flex items-center gap-2"><RadioGroupItem value="none" id="none" />Sem borda</span>
-                <span className="text-muted-foreground text-sm">Grátis</span>
-              </Label>
-              {addons.map((a) => (
-                <Label key={a.id} className={`flex items-center justify-between border rounded-md p-2.5 cursor-pointer ${addonId === a.id ? "border-primary bg-primary/5" : ""}`}>
-                  <span className="flex items-center gap-2"><RadioGroupItem value={a.id} id={a.id} />{a.name}</span>
-                  <span className="font-semibold text-primary">+ {brl(Number(a.price))}</span>
+          {showAddons && (
+            <div>
+              <Label className="mb-2 block font-semibold">Borda recheada (opcional)</Label>
+              <RadioGroup value={addonId} onValueChange={setAddonId} className="space-y-1.5">
+                <Label className={`flex items-center justify-between border rounded-md p-2.5 cursor-pointer ${
+                  addonId === "none" ? "border-primary bg-primary/5" : ""
+                }`}>
+                  <span className="flex items-center gap-2">
+                    <RadioGroupItem value="none" id="none" />Sem borda
+                  </span>
+                  <span className="text-muted-foreground text-sm">Gratis</span>
                 </Label>
-              ))}
-            </RadioGroup>
-          </div>
-        )}
+                {addons.map((a) => (
+                  <Label key={a.id} className={`flex items-center justify-between border rounded-md p-2.5 cursor-pointer ${
+                    addonId === a.id ? "border-primary bg-primary/5" : ""
+                  }`}>
+                    <span className="flex items-center gap-2">
+                      <RadioGroupItem value={a.id} id={a.id} />{a.name}
+                    </span>
+                    <span className="font-semibold text-primary">+ {brl(Number(a.price))}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
 
-        <div>
-          <Label htmlFor="notes">Observação (opcional)</Label>
-          <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: sem cebola" maxLength={200} rows={2} />
+          <div>
+            <Label htmlFor="notes" className="font-semibold">Observacao (opcional)</Label>
+            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ex: sem cebola" maxLength={200} rows={2} className="mt-1" />
+          </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus className="h-4 w-4" /></Button>
-            <span className="w-10 text-center font-bold">{qty}</span>
-            <Button variant="outline" size="icon" onClick={() => setQty((q) => q + 1)}><Plus className="h-4 w-4" /></Button>
+        {/* Rodape fixo com quantidade e botao */}
+        <div className="shrink-0 border-t bg-background px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}>
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="w-10 text-center font-bold text-lg">{qty}</span>
+              <Button variant="outline" size="icon"
+                onClick={() => setQty((q) => q + 1)}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <span className="text-2xl font-bold text-primary">{brl(total)}</span>
           </div>
-          <span className="text-2xl font-bold text-primary">{brl(total)}</span>
+          <Button onClick={handleAdd} size="lg" className="w-full text-base">
+            Adicionar ao carrinho
+          </Button>
         </div>
 
-        <DialogFooter>
-          <Button onClick={handleAdd} size="lg" className="w-full">Adicionar ao carrinho</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
