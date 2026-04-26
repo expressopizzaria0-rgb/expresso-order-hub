@@ -1,0 +1,15 @@
+{
+  "name": "Expresso Pizza e Esfirra",
+  "short_name": "Expresso",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
