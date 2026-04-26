@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Bell, Volume2 } from "lucide-react";
-import { brl } from "@/lib/format";
+import { Loader2, Bell, Volume2, Clipboard, MessageCircle, XCircle } from "lucide-react";
+import { brl, phoneDigits } from "@/lib/format";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { requestNotificationPermission } from "@/hooks/useOrderNotifications";
 
 const STATUS = [
@@ -14,7 +15,32 @@ const STATUS = [
   { v: "em_preparo", l: "Em preparo", c: "bg-amber-500" },
   { v: "pronto",     l: "Pronto",     c: "bg-emerald-500" },
   { v: "entregue",   l: "Entregue",   c: "bg-zinc-500" },
+  { v: "cancelado",  l: "Cancelado",  c: "bg-red-500" },
 ];
+
+function buildOrderText(o: any): string {
+  const lines: string[] = [];
+  lines.push(`Pedido #${o.id.slice(-6).toUpperCase()} — ${o.customer_name}`);
+  lines.push(`Telefone: ${o.customer_phone || "—"}`);
+  lines.push(`Tipo: ${o.order_type === "delivery" ? "Delivery" : "Retirada"}`);
+  if (o.order_type === "delivery" && o.customer_address) {
+    lines.push(`Endereço: ${o.customer_address}, ${o.customer_neighborhood}`);
+  }
+  lines.push("");
+  lines.push("Itens:");
+  (o.order_items || []).forEach((i: any) => {
+    const sz = i.size ? ` (${i.size})` : "";
+    const addon = i.addon_name ? ` + ${i.addon_name}` : "";
+    lines.push(`  ${i.quantity}x [${i.category_name}] ${i.product_name}${sz}${addon} — ${brl(Number(i.line_total))}`);
+  });
+  lines.push("");
+  lines.push(`Total: ${brl(Number(o.total))}`);
+  const pay = o.payment_method === "dinheiro" ? "Dinheiro" : o.payment_method === "pix" ? "Pix" : "Cartão";
+  lines.push(`Pagamento: ${pay}`);
+  if (o.change_for) lines.push(`Troco para: ${brl(Number(o.change_for))}`);
+  if (o.notes) lines.push(`Obs: ${o.notes}`);
+  return lines.join("\n");
+}
 
 export default function OnlineOrders() {
   const qc = useQueryClient();
@@ -127,13 +153,16 @@ export default function OnlineOrders() {
 
               <div className="text-sm border-t pt-2 space-y-0.5">
                 {(o.order_items || []).map((i: any) => (
-                  <div key={i.id} className="flex justify-between">
-                    <span>
+                  <div key={i.id} className="flex justify-between gap-2">
+                    <span className="flex flex-wrap items-baseline gap-1">
+                      <span className="text-xs font-medium text-muted-foreground bg-muted px-1 rounded shrink-0">
+                        {i.category_name}
+                      </span>
                       {i.quantity}x {i.product_name}
                       {i.size ? ` (${i.size})` : ""}
                       {i.addon_name ? ` + ${i.addon_name}` : ""}
                     </span>
-                    <span className="text-muted-foreground text-xs">{brl(Number(i.line_total))}</span>
+                    <span className="text-muted-foreground text-xs shrink-0">{brl(Number(i.line_total))}</span>
                   </div>
                 ))}
               </div>
@@ -151,14 +180,55 @@ export default function OnlineOrders() {
                 <div className="text-xs italic text-muted-foreground">Obs: {o.notes}</div>
               )}
 
-              <div className="flex gap-1 flex-wrap pt-1">
-                {STATUS.map((s) => (
-                  <Button key={s.v} size="sm"
-                    variant={o.status === s.v ? "default" : "outline"}
-                    onClick={() => setStatus(o.id, s.v)}>
-                    {s.l}
+              <div className="space-y-2 pt-1">
+                {/* Botões de status (exceto cancelado) */}
+                <div className="flex gap-1 flex-wrap">
+                  {STATUS.filter((s) => s.v !== "cancelado").map((s) => (
+                    <Button key={s.v} size="sm"
+                      variant={o.status === s.v ? "default" : "outline"}
+                      onClick={() => setStatus(o.id, s.v)}>
+                      {s.l}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Botões de ação */}
+                <div className="flex gap-1 flex-wrap">
+                  {o.status !== "cancelado" && o.status !== "entregue" && (
+                    <Button size="sm" variant="outline"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={() => {
+                        if (window.confirm(`Cancelar pedido de ${o.customer_name}?`)) {
+                          setStatus(o.id, "cancelado");
+                        }
+                      }}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" />
+                      Cancelar
+                    </Button>
+                  )}
+
+                  {o.customer_phone && (
+                    <Button size="sm" variant="outline"
+                      className="text-green-700 border-green-300 hover:bg-green-50"
+                      onClick={() => {
+                        const phone = phoneDigits(o.customer_phone);
+                        const msg = `Olá ${o.customer_name}! ✅ Seu pedido foi recebido e está sendo preparado. Em breve estará pronto! Obrigado por escolher a Expresso Pizza e Esfirra 🍕`;
+                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+                      }}>
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                      Confirmar p/ WhatsApp
+                    </Button>
+                  )}
+
+                  <Button size="sm" variant="outline"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(buildOrderText(o));
+                      toast.success("Pedido copiado!");
+                    }}>
+                    <Clipboard className="h-3.5 w-3.5 mr-1" />
+                    Copiar
                   </Button>
-                ))}
+                </div>
               </div>
             </Card>
           );
