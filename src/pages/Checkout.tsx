@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import PublicHeader from "@/components/PublicHeader";
@@ -67,6 +67,8 @@ export default function Checkout() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hasSaved, setHasSaved] = useState(!!saved);
+  const [lookingUp, setLookingUp] = useState(false);
+  const phoneDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSaved = () => {
     localStorage.removeItem(CUSTOMER_KEY);
@@ -74,6 +76,38 @@ export default function Checkout() {
     setType("delivery"); setPayment("pix");
     setHasSaved(false);
     toast.success("Dados apagados");
+  };
+
+  const handlePhoneLookup = async (rawPhone: string) => {
+    const digits = phoneDigits(rawPhone);
+    if (digits.length < 10) return;
+    setLookingUp(true);
+    try {
+      const { data: prev } = await supabase
+        .from("orders")
+        .select("customer_name, customer_address, customer_neighborhood, order_type, payment_method")
+        .eq("channel", "online")
+        .eq("customer_phone", rawPhone.trim())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (prev) {
+        if (prev.customer_name && !name) setName(prev.customer_name);
+        if (prev.customer_address && !address) setAddress(prev.customer_address);
+        if (prev.customer_neighborhood && !neighborhood) setNeighborhood(prev.customer_neighborhood);
+        if (prev.order_type === "delivery" || prev.order_type === "retirada") setType(prev.order_type);
+        if (prev.payment_method === "dinheiro" || prev.payment_method === "pix" || prev.payment_method === "cartao") {
+          setPayment(prev.payment_method);
+        }
+        setHasSaved(true);
+        toast.success("Dados preenchidos pelo histórico de pedidos");
+      }
+    } catch {
+      // conveniência — falha silenciosamente
+    } finally {
+      setLookingUp(false);
+    }
   };
 
   const deliveryFee = type === "delivery" ? Number(settings?.delivery_fee ?? 0) : 0;
@@ -125,10 +159,8 @@ export default function Checkout() {
       })));
       if (ierr) throw ierr;
 
-      // Salva dados do cliente para proximos pedidos
       saveCustomer({ name: name.trim(), phone: phone.trim(), address: address.trim(), neighborhood: neighborhood.trim(), type, payment });
 
-      // Monta mensagem WhatsApp
       const lines: string[] = [];
       lines.push(`*Novo Pedido — Expresso Pizza e Esfirra*`);
       lines.push(`*Cliente:* ${name}`);
@@ -223,7 +255,25 @@ export default function Checkout() {
                 </div>
                 <div>
                   <Label htmlFor="p">Telefone *</Label>
-                  <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} placeholder="(81) 9..." />
+                  <div className="relative">
+                    <Input
+                      id="p"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current);
+                        phoneDebounceRef.current = setTimeout(() => {
+                          handlePhoneLookup(e.target.value);
+                        }, 800);
+                      }}
+                      onBlur={() => handlePhoneLookup(phone)}
+                      maxLength={20}
+                      placeholder="(81) 9..."
+                    />
+                    {lookingUp && (
+                      <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
                 </div>
               </div>
 
