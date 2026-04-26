@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrderNotifications, requestNotificationPermission } from "@/hooks/useOrderNotifications";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, ClipboardList, UtensilsCrossed, BarChart3, Settings, LogOut, Loader2, Bell, BellOff } from "lucide-react";
+import { LayoutGrid, ClipboardList, UtensilsCrossed, BarChart3, Settings, LogOut, Loader2, Bell, BellOff, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function PanelLayout() {
@@ -35,6 +35,7 @@ export default function PanelLayout() {
     { to: "/admin/cardapio",  icon: UtensilsCrossed,label: "Cardápio",  roles: ["admin"] },
     { to: "/admin/relatorios",icon: BarChart3,       label: "Relatórios",roles: ["admin"] },
     { to: "/admin/config",    icon: Settings,        label: "Configurações", roles: ["admin"] },
+    { to: "/admin/clientes",  icon: Users,           label: "Clientes",      roles: ["admin"] },
   ].filter((l) => role && l.roles.includes(role));
 
   const handleEnableNotif = async () => {
