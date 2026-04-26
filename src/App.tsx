@@ -15,6 +15,7 @@ import OnlineOrders from "./pages/panel/OnlineOrders";
 import MenuAdmin from "./pages/admin/MenuAdmin";
 import Reports from "./pages/admin/Reports";
 import ConfigAdmin from "./pages/admin/ConfigAdmin";
+import TopCustomers from "./pages/admin/TopCustomers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/admin/cardapio" element={<MenuAdmin />} />
                 <Route path="/admin/relatorios" element={<Reports />} />
                 <Route path="/admin/config" element={<ConfigAdmin />} />
+                <Route path="/admin/clientes" element={<TopCustomers />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
