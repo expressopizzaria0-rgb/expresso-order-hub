@@ -101,7 +101,7 @@ export default function Checkout() {
       lines.push("*Itens:*");
       items.forEach((i) => {
         const sz = i.size ? ` (${i.size})` : "";
-        lines.push(`• ${i.quantity}x ${i.productName}${sz} — ${brl((i.unitPrice + i.addonPrice) * i.quantity)}`);
+        lines.push(`• ${i.quantity}x *[${i.categoryName}]* ${i.productName}${sz} — ${brl((i.unitPrice + i.addonPrice) * i.quantity)}`);
         if (i.addonName) lines.push(`   + ${i.addonName}`);
         if (i.notes) lines.push(`   _obs: ${i.notes}_`);
       });
